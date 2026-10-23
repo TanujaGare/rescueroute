@@ -24,7 +24,7 @@
 | 2:45 | A dispatch card | "Green facts are computed in code: distance, pickup time, safety slack. Blue is the AI's reasoning, which is never trusted on its own. The injected note had no effect, because the model has no approval tool and code rejects unsafe plans." |
 | 3:15 | Approve one, reject one | "A human decides. Rejected food goes back to open; approved food is locked. Both actions are audit-logged." |
 | 3:40 | Bulk-rice row | "400 kg exceeds every vehicle, so the system says so instead of pretending." |
-| 4:00 | Terminal: `npm test` and the evaluation results | "55 automated tests, including timeouts, malformed AI output and cross-user access. Across 200 synthetic scenarios we deliver 67% more food safely than first-come-first-served dispatch, with zero unsafe dispatches versus 1,558." |
+| 4:00 | Terminal: `npm test` and the evaluation results | "62 automated tests, including timeouts, malformed AI output and cross-user access. Across 200 synthetic scenarios we deliver 67% more food safely than first-come-first-served dispatch, with zero unsafe dispatches versus 1,558." |
 | 4:40 | Close | "The AI reasons; code guarantees safety; humans stay in control. That's RescueRoute." |
 
 **Backup:** if the Gemini API is slow or down, the Gemini AI planner stage shows *failed* with the classified reason (for example `RATE_LIMITED`) and the Deterministic fallback stage shows a *warning*. That is itself a reliability feature worth showing.
@@ -34,7 +34,7 @@
 2. **Solution:** agent proposes, code verifies, human approves (diagram).
 3. **Live demo.**
 4. **Engineering:** bounded loop, 7 allow-listed tools, retries, timeouts, fallback, gap-fill, verification.
-5. **Security and testing:** threat table, 55 tests, prompt-injection defence.
+5. **Security and testing:** threat table, 62 tests, prompt-injection defence.
 6. **Results and next steps:** +67.5% kg vs baseline, p95 under 2 ms planner, Gemini metrics; next is the Maps Routes API, Firebase Auth and multi-stop pooling.
 
 ## 4. Criteria scoring matrix
@@ -44,6 +44,6 @@
 | **Code quality** | Layered modules (domain, agent, data, API, UI); dependency injection; one schema source for validation and Gemini declarations; no build step; lint script |
 | **Security** | See README §5: RBAC, signed tokens, scrypt, CSP, rate limits, IDOR protection, prompt-injection defence, audit log, human approval |
 | **Efficiency** | Planner p50 0.74 ms; listing outputs compacted in the timeline; bounded turns and tool calls; 5 runtime dependencies; one static frontend with no framework |
-| **Testing** | 55 tests (97.2% line coverage) across unit, integration, agent, security, accessibility and failure paths; CI on every push; reproducible evaluation script |
+| **Testing** | 62 tests (97.2% line coverage) across unit, integration, agent, security, accessibility and failure paths; CI on every push; reproducible evaluation script |
 | **Accessibility** | Semantic landmarks, skip link, labelled forms, `role="status"`/`aria-live` updates, `aria-current` navigation, visible focus, SVG map with text alternative and legend, dark mode, reduced-motion support, responsive down to phone width |
 | **Problem alignment** | Real-world sustainability and food problem; agentic plan → act → verify → evaluate; Gemini function calling; measurable impact |

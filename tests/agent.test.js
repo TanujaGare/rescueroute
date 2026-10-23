@@ -47,7 +47,7 @@ test('Gemini success: structured proposals are verified and saved; no fallback s
   assert.equal(run.status, 'completed');
   assert.equal(run.planner_mode, 'gemini');
   assert.equal(run.fallback_reason, null);
-  assert.deepEqual(run.stages.map((s) => s.key), ['analyze', 'assess', 'plan', 'validate', 'save', 'evaluate', 'summarize']);
+  assert.deepEqual(run.stages.map((s) => s.key), ['analyze', 'assess', 'plan', 'select', 'validate', 'save', 'evaluate', 'summarize']);
   assert.ok(run.stages.every((s) => s.status === 'success' && typeof s.duration_ms === 'number' && s.started_at && s.finished_at));
   assert.equal(stage(run, 'plan').label, 'Gemini AI planner');
   assert.equal(run.metrics.by_source.gemini, plan.length);
@@ -62,6 +62,8 @@ test('Gemini success: structured proposals are verified and saved; no fallback s
   assert.equal(d.assumptions, 'Road factor estimate.');
   assert.ok(d.constraints_checked.includes('cold_chain_vehicle'));
   assert.ok(run.metrics.comparison.deterministic_only.kg > 0, 'same-input baseline is reported');
+  assert.equal(run.metrics.plan_selected, 'gemini');
+  assert.equal(stage(run, 'select').status, 'success');
 });
 
 test('missing API key: plan stage skipped, fallback disclosed, run marked with warnings', async () => {
@@ -169,7 +171,8 @@ test('invalid IDs, capacity, unavailable vehicle, partial quantity and duplicate
   assert.equal(stage(run, 'validate').status, 'warning');
   assert.equal(run.metrics.proposals_generated, run.metrics.proposals_validated + 8);
   assert.ok(run.metrics.validation_rate < 1);
-  assert.equal(run.dispatches.filter((d) => d.donation_id === 'don_mess_fruit').length, 1, 'no duplicate allocation');
+  const perDonation = run.dispatches.reduce((m, d) => m.set(d.donation_id, (m.get(d.donation_id) ?? 0) + 1), new Map());
+  assert.ok([...perDonation.values()].every((n) => n === 1), 'no duplicate allocation');
   assert.ok(!run.dispatches.some((d) => d.vehicle_id === 'veh_tempo' || d.donation_id === 'don_rice_bulk'));
 });
 
@@ -315,4 +318,54 @@ test('Gemini adapter fails over to a backup model on overload, but not on auth e
   const badKey = Object.assign(new Error('API key not valid'), { status: 400 });
   const m2 = createGeminiModel({ apiKey: 'k', model: 'primary', fallbackModels: ['backup'], client: fakeClient({ primary: badKey }) });
   await assert.rejects(() => m2.generate({ contents: [], tools: [] }), (e) => e.code === 'INVALID_API_KEY');
+});
+
+test('one-turn planning: the first prompt carries the situation, ranked options and verified baseline', async () => {
+  const probe = buildTestApp();
+  const plan = seededPlan(probe.repo);
+  let firstPrompt = '';
+  const scripted = scriptedModel([[
+    ...plan.map((a) => propose(a.donation_id, a.recipient_id, a.vehicle_id, a.quantity_kg)),
+    ['finish', { summary: 'Adopted the verified baseline.', unallocated: [{ donation_id: 'don_rice_bulk', reason: 'Too heavy' }] }],
+  ]]);
+  const model = { name: 'one-turn', generate: (req) => { firstPrompt ||= req.contents[0].parts[0].text; return scripted.generate(req); } };
+  const { orchestrator, repo } = buildTestApp({ model });
+  const run = await runAndWait(orchestrator, repo);
+  assert.equal(run.metrics.model_calls, 1, 'whole plan in a single Gemini request');
+  assert.equal(run.planner_mode, 'gemini');
+  assert.match(firstPrompt, /<situation>/);
+  const brief = JSON.parse(firstPrompt.match(/<situation>(.*)<\/situation>/s)[1]);
+  assert.equal(brief.baseline_plan.dispatches.length, plan.length);
+  assert.ok(brief.donations.every((d) => Array.isArray(d.options)));
+  assert.ok(brief.donations.find((d) => d.id === 'don_hotel_breakfast').donor_notes_untrusted.includes('IGNORE'), 'injected note is passed only as labelled data');
+});
+
+test('plan selection keeps the verified baseline when Gemini allocates less food, and says so', async () => {
+  const model = scriptedModel([[propose('don_mess_fruit', 'rcp_talegaon_bank', 'veh_cargo_van', 30)], [['finish', { summary: 'done' }]]]);
+  const { orchestrator, repo } = buildTestApp({ model, agent: { maxModelTurns: 2 } });
+  const run = await runAndWait(orchestrator, repo);
+  assert.equal(stage(run, 'select').status, 'warning');
+  assert.equal(run.metrics.plan_selected, 'deterministic');
+  assert.equal(run.planner_mode, 'deterministic_fallback');
+  assert.match(run.fallback_reason, /^GEMINI_PLAN_INFERIOR/);
+  assert.equal(run.metrics.allocated_kg, run.metrics.comparison.deterministic_only.kg);
+  assert.ok(run.dispatches.every((d) => d.source === 'deterministic'));
+});
+
+test('impact estimate is derived from verified kilograms with cited factors', async () => {
+  const { estimateImpact, IMPACT_FACTORS } = await import('../src/domain/impact.js');
+  assert.deepEqual(estimateImpact(42), { meals: 100, co2e_kg: 105 });
+  assert.ok(IMPACT_FACTORS.sources.length >= 2);
+  const { orchestrator, repo } = buildTestApp();
+  const run = await runAndWait(orchestrator, repo);
+  assert.equal(run.metrics.impact_estimate.meals, Math.round(run.metrics.allocated_kg / 0.42));
+});
+
+test('distance cache returns identical results without recomputation', () => {
+  const s = new PlanState({ donations: [], recipients: [], vehicles: [], now: 0 });
+  const a = { lat: 18.5, lng: 73.8 };
+  const b = { lat: 18.6, lng: 73.9 };
+  const first = s.distance(a, b);
+  assert.equal(s.distance(a, b), first);
+  assert.equal(s.distanceCache.size, 1);
 });

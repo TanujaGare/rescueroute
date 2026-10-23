@@ -431,6 +431,9 @@ function renderRun(run) {
   const metric = (k, v) => el('div', {}, el('dt', {}, k), el('dd', {}, v));
   $('#run-metrics').replaceChildren(...(m ? [
     metric('Planner used', MODE_LABELS[m.planner_mode] ?? '—'),
+    metric('Plan kept', m.plan_selected === 'gemini' ? 'Gemini (≥ verified baseline)' : 'Verified baseline'),
+    metric('Est. meals rescued', m.impact_estimate ? `≈ ${m.impact_estimate.meals}` : '—'),
+    metric('Est. CO₂e avoided', m.impact_estimate ? `≈ ${m.impact_estimate.co2e_kg} kg` : '—'),
     metric('Planner time', fmtMs(m.planner_ms)),
     metric('End-to-end time', fmtMs(m.latency_ms)),
     metric('Gemini call success', m.model_calls ? `${pct(m.model_success_rate)} (${m.model_successes}/${m.model_calls})` : 'not called'),

@@ -51,6 +51,18 @@ export class PlanState {
       vehicles.map((v) => [v.id, { ...v, available: v.available ?? true, pos: { lat: v.lat, lng: v.lng }, freeAtMin: 0, trips: 0 }]),
     );
     this.assignments = new Map();
+    // Road distances are recomputed many times while ranking options; cache them per coordinate pair.
+    this.distanceCache = new Map();
+  }
+
+  distance(a, b) {
+    const key = `${a.lat},${a.lng}|${b.lat},${b.lng}`;
+    let km = this.distanceCache.get(key);
+    if (km === undefined) {
+      km = roadKm(a, b);
+      this.distanceCache.set(key, km);
+    }
+    return km;
   }
 
   minutesFromNow(iso) {
@@ -103,8 +115,8 @@ export class PlanState {
     }
 
     const donor = { lat: donation.donor_lat, lng: donation.donor_lng };
-    const toDonorKm = roadKm(vehicle.pos, donor);
-    const toRecipientKm = roadKm(donor, recipient);
+    const toDonorKm = this.distance(vehicle.pos, donor);
+    const toRecipientKm = this.distance(donor, recipient);
     const arriveDonor = vehicle.freeAtMin + travelMinutes(toDonorKm, vehicle.speed_kmh);
     const pickupMin = Math.max(arriveDonor, this.minutesFromNow(donation.ready_at), 0);
     const deliverMin = pickupMin + LOADING_MINUTES + travelMinutes(toRecipientKm, vehicle.speed_kmh);

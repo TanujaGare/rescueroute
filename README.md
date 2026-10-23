@@ -36,11 +36,11 @@ If Gemini is busy or rate-limited, the run switches to a backup model, or uses t
 | Area | Evidence | Reproduce |
 |---|---|---|
 | **Problem alignment** | Bounded agent workflow: analyze → assess → Gemini plan (tool calls) → fallback → verify → save → evaluate → summarize, with human approval | `npm run check:gemini` |
-| **Testing** | 58 automated tests (unit, API integration, agent failure paths, security, accessibility); **97.2% line / 87.9% branch coverage** | `npm run test:coverage` |
+| **Testing** | 62 automated tests (unit, API integration, agent failure paths, security, accessibility); **97.2% line / 87.9% branch coverage** | `npm run test:coverage` |
 | **Security** | Threat model in [SECURITY.md](SECURITY.md); RBAC, IDOR protection, CSP, rate limits, prompt-injection containment, audit log; **0 production vulnerabilities** | `npm run audit` |
 | **Code quality** | ESLint (recommended rules plus an `innerHTML` ban), layered modules, dependency injection, one Zod schema for validation and the Gemini tool declarations, CI on every push | `npm run lint` |
-| **Efficiency** | Deterministic planner p50 0.74 ms per scenario; batched Gemini tool calls; 5 runtime dependencies; no frontend build | `npm run evaluate` |
-| **Impact** | +67.5% food delivered safely vs first-come-first-served dispatch on 200 synthetic scenarios, with 0 vs 1,558 unsafe dispatches | `npm run evaluate` |
+| **Efficiency** | Gemini plans a whole run in **1 request (13.7 s)**, down from 8 requests and 68 s; deterministic planner p50 0.74 ms; cached distance matrix; 5 runtime dependencies; no frontend build | `npm run check:gemini`, `npm run evaluate` |
+| **Impact** | Per-run estimate of meals rescued and CO₂e avoided (cited factors); +67.5% food delivered safely vs first-come-first-served dispatch on 200 synthetic scenarios, with 0 vs 1,558 unsafe dispatches | `npm run evaluate` |
 | **Accessibility** | Skip link, landmarks, labelled controls, live regions, table captions, focus styles, reduced motion, dark mode; checked by automated tests | `tests/accessibility.test.js` |
 
 **Contents:** [Evaluator access](#evaluator-access) · [Problem](#1-the-problem) · [Solution](#2-what-rescueroute-does) · [Architecture](#3-architecture) · [Google tech](#4-google-technology) · [Security](#5-security) · [Results](#6-measured-results) · [Tests](#7-tests) · [Run locally](#8-run-it-locally) · [Deploy](#9-deploy) · [API](#10-api) · [Disclosure](#11-disclosure)
@@ -102,10 +102,11 @@ Each run is persisted as eight **stages** in `run_stages`, each with a real stat
 | 1 | **Analyze situation** | Reads open, unexpired donations, recipients and vehicles (including availability) from the database |
 | 2 | **Assess constraints** | Deterministic urgency bands, cold-chain needs, and which donations have *any* feasible route (with the reason when none exists) |
 | 3 | **Gemini AI planner** | Gemini in forced tool-call mode reads the data via tools and calls `propose_dispatch` with a strict schema: donation, recipient, vehicle, quantity, priority, rationale, constraints considered and assumptions. Each proposal is checked in code immediately; infeasible ones are rejected with reasons |
-| 4 | **Deterministic fallback** *(only when needed)* | Runs if Gemini is not configured or fails (**warning**, with the classified reason), or if Gemini finished but left feasible food unallocated (gap-fill) |
+| 4 | **Plan selection** | Keeps Gemini's plan only if it allocates at least as much food as the verified baseline; otherwise keeps the baseline and discloses `GEMINI_PLAN_INFERIOR` |
+| 4b | **Deterministic fallback** *(only when needed)* | Runs if Gemini is not configured or fails (**warning**, with the classified reason), or if Gemini finished but left feasible food unallocated (gap-fill) |
 | 5 | **Independent verification** | Re-reads the database and re-checks every proposal: IDs exist, donation still open and unexpired, vehicle available, quantity valid, no duplicates, then replays capacity, cold-chain and timing on a fresh state. Failures are recorded and **never saved** |
 | 6 | **Save proposals** | One transaction; each donation is claimed only if still `open` and unexpired, and a partial unique index forbids two live dispatches for one donation |
-| 7 | **Evaluate success criteria** | 4 explicit criteria, plus a comparison with the deterministic planner on the **same input and constraints** |
+| 7 | **Evaluate success criteria** | 4 explicit criteria, a comparison with the deterministic planner on the **same input and constraints**, and an impact estimate (meals at 420 g each per WRAP; about 2.5 kg CO₂e per kg of food per FAO 2013) |
 | 8 | **Summarize** | Plain-language outcome: what was allocated, by which planner, and what remains unresolved and why |
 
 **Gemini reliability:** per-call timeout of 25 s. Retries with exponential backoff happen only for retryable errors (rate limit, timeout, 5xx, network, malformed output). A bad key (`INVALID_API_KEY`), `UNAUTHORIZED`, `MODEL_NOT_FOUND` or `BAD_REQUEST` fails fast with a clear message.
@@ -163,12 +164,19 @@ Run `npm run evaluate`. Results are written to [evaluation/results.json](evaluat
 
 **Gemini vs deterministic on the same input:** every Gemini run's Evaluate stage records both results side by side (`metrics.comparison`).
 
-**One measured live Gemini run** (`npm run check:gemini`, 23 Oct 2026, a single run, not a benchmark): the primary `gemini-3.5-flash` returned *503 high demand*, so the agent failed over to `gemini-3.1-flash-lite`. Gemini calls succeeded 8/8; Gemini produced 11 proposals, code rejected 1 and saved 10 (all from Gemini, none from gap-fill); 386 kg allocated (81% of feasible) vs 446 kg (94%) for the deterministic planner on the same data; urgent coverage 2/2; 0 violations saved; planner stage 68 s. In this run **Gemini allocated less food than the rule-based planner**, and the app reports that honestly (3/4 criteria, coverage criterion failed).
+**Live Gemini runs** (`npm run check:gemini`, 23 Oct 2026, single runs, not a benchmark):
+
+| Version | Gemini requests | Planning time | Food allocated | Criteria | Violations saved |
+|---|---|---|---|---|---|
+| v1: multi-turn tool loop | 8 | 68 s | 386 kg (81% of feasible) | 3/4 | 0 |
+| **v2: one-turn plan over a verified baseline** (current) | **1** | **13.7 s** | **446 kg (94%)** | **4/4** | 0 |
+
+What changed in v2: the first request carries the full situation, code-ranked feasible options for every donation and a code-verified baseline plan. Gemini adopts or improves the baseline and proposes every dispatch plus `finish` in a single turn. A **Plan selection** stage then keeps Gemini's plan only if it allocates at least as much food as the baseline; otherwise the baseline is kept and the run is disclosed as `GEMINI_PLAN_INFERIOR`. In the measured v2 run Gemini's plan matched the baseline (446 kg) and was kept, with 9 of 10 dispatches from Gemini and 1 from gap-fill.
 
 ## 7. Tests
 
 ```bash
-npm test               # 58 tests: unit, API integration, agent workflow, security, accessibility
+npm test               # 62 tests: unit, API integration, agent workflow, security, accessibility
 npm run test:coverage  # same, with coverage report (97.2% lines)
 npm run check:gemini   # manual LIVE check: real Gemini request + one full run (needs GEMINI_API_KEY)
 npm run lint           # ESLint + syntax, XSS and debugger guards
