@@ -36,10 +36,10 @@ If Gemini is busy or rate-limited, the run switches to a backup model, or uses t
 | Area | Evidence | Reproduce |
 |---|---|---|
 | **Problem alignment** | Bounded agent workflow: analyze → assess → Gemini plan (tool calls) → fallback → verify → save → evaluate → summarize, with human approval | `npm run check:gemini` |
-| **Testing** | 62 automated tests (unit, API integration, agent failure paths, security, accessibility); **97.2% line / 87.9% branch coverage** | `npm run test:coverage` |
+| **Testing** | 64 automated tests (unit, API integration, agent failure paths, security, accessibility, performance headers); **97.7% line / 89.0% branch coverage** | `npm run test:coverage` |
 | **Security** | Threat model in [SECURITY.md](SECURITY.md); RBAC, IDOR protection, CSP, rate limits, prompt-injection containment, audit log; **0 production vulnerabilities** | `npm run audit` |
-| **Code quality** | ESLint (recommended rules plus an `innerHTML` ban), layered modules, dependency injection, one Zod schema for validation and the Gemini tool declarations, CI on every push | `npm run lint` |
-| **Efficiency** | Gemini plans a whole run in **1 request (13.7 s)**, down from 8 requests and 68 s; deterministic planner p50 0.74 ms; cached distance matrix; 5 runtime dependencies; no frontend build | `npm run check:gemini`, `npm run evaluate` |
+| **Code quality** | Small single-purpose modules (routes, middleware, agent stages, model loop, verifier, report), dependency injection, ESLint (recommended rules plus an `innerHTML` ban), one Zod schema for validation and Gemini tool declarations, CI on every push | `npm run lint` |
+| **Efficiency** | Gemini plans a whole run in **1 request: median 6.1 s over 3 live runs** (was 8 requests, 68 s); non-blocking async scrypt; gzip compression; immutable caching of versioned assets; memoised option ranking; DB index on donation status and expiry; UI polling with backoff that pauses in hidden tabs; deterministic planner p50 0.77 ms | `npm run evaluate` |
 | **Impact** | Per-run estimate of meals rescued and CO₂e avoided (cited factors); +67.5% food delivered safely vs first-come-first-served dispatch on 200 synthetic scenarios, with 0 vs 1,558 unsafe dispatches | `npm run evaluate` |
 | **Accessibility** | Skip link, landmarks, labelled controls, live regions, table captions, focus styles, reduced motion, dark mode; checked by automated tests | `tests/accessibility.test.js` |
 
@@ -87,9 +87,9 @@ flowchart LR
 | Layer | Files | Responsibility |
 |---|---|---|
 | Domain | [src/domain/planning.js](src/domain/planning.js), [geo.js](src/domain/geo.js) | Constraint engine (capacity, cold chain, expiry, closing time), ranking, best-fit greedy planner |
-| AI orchestration | [src/agent/orchestrator.js](src/agent/orchestrator.js), [tools.js](src/agent/tools.js), [gemini.js](src/agent/gemini.js) | Bounded agent loop, tool allow-list, retries, timeouts, fallback, verification, evaluation |
+| AI orchestration | [orchestrator.js](src/agent/orchestrator.js) (stage sequence), [model-loop.js](src/agent/model-loop.js) (bounded Gemini loop, retries, timeouts), [policy.js](src/agent/policy.js) (system policy, situation brief), [tools.js](src/agent/tools.js) (allow-listed tools), [verifier.js](src/agent/verifier.js) (re-verification), [report.js](src/agent/report.js) (criteria, metrics, summary), [gemini.js](src/agent/gemini.js) (SDK adapter, error classes, model failover) | One responsibility per module |
 | Data access | [src/db/](src/db/) | Schema, parameterised queries, atomic proposal persistence, seed data |
-| API | [src/app.js](src/app.js), [src/validation.js](src/validation.js) | REST endpoints, Zod validation, security middleware |
+| API | [src/app.js](src/app.js) (composition), [src/http/middleware.js](src/http/middleware.js), [src/http/routes/](src/http/routes/), [src/validation.js](src/validation.js) | Routers per area, security headers, compression, caching, rate limits, Zod validation, central error handler |
 | Security | [src/security/auth.js](src/security/auth.js) | Password hashing, signed tokens, RBAC |
 | UI | [public/](public/) | Dashboard, map, agent timeline, approval workflow |
 
@@ -164,20 +164,20 @@ Run `npm run evaluate`. Results are written to [evaluation/results.json](evaluat
 
 **Gemini vs deterministic on the same input:** every Gemini run's Evaluate stage records both results side by side (`metrics.comparison`).
 
-**Live Gemini runs** (`npm run check:gemini`, 23 Oct 2026, single runs, not a benchmark):
+**Live Gemini runs** (real API calls, 23 Oct 2026; reproduce with `npm run evaluate`, which writes [evaluation/results.json](evaluation/results.json)):
 
-| Version | Gemini requests | Planning time | Food allocated | Criteria | Violations saved |
-|---|---|---|---|---|---|
-| v1: multi-turn tool loop | 8 | 68 s | 386 kg (81% of feasible) | 3/4 | 0 |
-| **v2: one-turn plan over a verified baseline** (current) | **1** | **13.7 s** | **446 kg (94%)** | **4/4** | 0 |
+| Version | Runs | Gemini requests per run | Run time | Food allocated | Dispatches from Gemini | Criteria met | Violations saved |
+|---|---|---|---|---|---|---|---|
+| v1: multi-turn tool loop | 1 | 8 | 68 s | 386 kg (81%) | 10 of 10 | 3/4 | 0 |
+| **v2: one-turn plan over a verified baseline** (current) | **3** | **1** | **median 6.1 s** (max 6.3 s) | **446 kg (94%) every run** | **10 of 10, no gap-fill** | **4/4 every run** | 0 |
 
-What changed in v2: the first request carries the full situation, code-ranked feasible options for every donation and a code-verified baseline plan. Gemini adopts or improves the baseline and proposes every dispatch plus `finish` in a single turn. A **Plan selection** stage then keeps Gemini's plan only if it allocates at least as much food as the baseline; otherwise the baseline is kept and the run is disclosed as `GEMINI_PLAN_INFERIOR`. In the measured v2 run Gemini's plan matched the baseline (446 kg) and was kept, with 9 of 10 dispatches from Gemini and 1 from gap-fill.
+About 4,300 input and 1,400 output tokens per run (`gemini-3.1-flash-lite` via automatic failover). What changed in v2: the first request carries the full situation, code-ranked feasible options for every donation and a code-verified baseline plan. Gemini adopts or improves the baseline and proposes every dispatch plus `finish` in a single turn. A **Plan selection** stage then keeps Gemini's plan only if it allocates at least as much food as the baseline; otherwise the baseline is kept and the run is disclosed as `GEMINI_PLAN_INFERIOR`.
 
 ## 7. Tests
 
 ```bash
-npm test               # 62 tests: unit, API integration, agent workflow, security, accessibility
-npm run test:coverage  # same, with coverage report (97.2% lines)
+npm test               # 64 tests: unit, API integration, agent workflow, security, accessibility
+npm run test:coverage  # same, with coverage report (97.7% lines, 89.0% branches)
 npm run check:gemini   # manual LIVE check: real Gemini request + one full run (needs GEMINI_API_KEY)
 npm run lint           # ESLint + syntax, XSS and debugger guards
 npm run audit          # production dependency audit

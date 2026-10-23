@@ -95,3 +95,12 @@ test('greedy best-fit keeps the large recipient free for a large donation', () =
   assert.equal(plan.length, 2);
   assert.equal(plan.find((a) => a.donation_id === 'd_small').recipient_id, 'r_small');
 });
+
+test('option rankings are memoised until a commit invalidates them', () => {
+  const s = fixture();
+  const first = s.rankOptions('d_meal', 5);
+  assert.equal(s.rankCache.size, 1);
+  assert.deepEqual(s.rankOptions('d_meal', 5), first, 'cached result is identical');
+  s.commit('d_milk', 'r_home', 'v_cold', { rationale: 't', source: 'deterministic' });
+  assert.equal(s.rankCache.size, 0, 'commit clears stale rankings');
+});

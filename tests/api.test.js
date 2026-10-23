@@ -60,7 +60,7 @@ test('protected routes require a valid, untampered token', async () => {
   assert.equal((await request(app).get('/api/overview').set('Authorization', `Bearer ${expired}`)).status, 401);
 });
 
-test('token and password primitives', () => {
+test('token and password primitives', async () => {
   const t = signToken({ sub: 'u' }, 's'.repeat(32), 60);
   assert.equal(verifyToken(t, 's'.repeat(32)).sub, 'u');
   const [body, sig] = t.split('.');
@@ -68,9 +68,9 @@ test('token and password primitives', () => {
   assert.equal(verifyToken(tampered, 's'.repeat(32)), null);
   assert.equal(verifyToken(`${body}`, 's'.repeat(32)), null);
   const h = hashPassword('pw');
-  assert.ok(verifyPassword('pw', h));
-  assert.ok(!verifyPassword('pw2', h));
-  assert.ok(!verifyPassword('pw', 'garbage'));
+  assert.ok(await verifyPassword('pw', h));
+  assert.ok(!(await verifyPassword('pw2', h)));
+  assert.ok(!(await verifyPassword('pw', 'garbage')));
 });
 
 test('overview returns computed KPIs without leaking password hashes', async () => {
@@ -316,4 +316,21 @@ test('instant demo sign-in can be disabled', async () => {
   const { app, config } = buildTestApp();
   config.demoLoginEnabled = false;
   assert.equal((await request(app).post('/api/auth/demo')).status, 404);
+});
+
+test('performance headers: compression, long-lived caching for versioned assets, revalidated HTML', async () => {
+  const { app } = buildTestApp();
+  const js = await request(app).get('/app.js').set('Accept-Encoding', 'gzip');
+  assert.equal(js.headers['content-encoding'], 'gzip');
+  assert.match(js.headers['cache-control'], /max-age=31536000, immutable/);
+  const html = await request(app).get('/');
+  assert.equal(html.headers['cache-control'], 'no-cache');
+});
+
+test('unknown email and wrong password are indistinguishable', async () => {
+  const { app } = buildTestApp();
+  const a = await request(app).post('/api/auth/login').send({ email: 'nobody@rescueroute.demo', password: 'x' });
+  const b = await request(app).post('/api/auth/login').send({ email: 'coordinator@rescueroute.demo', password: 'x' });
+  assert.equal(a.status, 401);
+  assert.deepEqual(a.body, b.body);
 });

@@ -1,20 +1,31 @@
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, scrypt, scryptSync, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 
 const SCRYPT_KEYLEN = 64;
+const MAX_TOKEN_LENGTH = 2048;
+const scryptAsync = promisify(scrypt);
 
+/** Synchronous hash, used only when seeding accounts at startup. */
 export function hashPassword(password) {
   const salt = randomBytes(16);
   const hash = scryptSync(password, salt, SCRYPT_KEYLEN);
   return `scrypt$${salt.toString('base64url')}$${hash.toString('base64url')}`;
 }
 
-export function verifyPassword(password, stored) {
+/**
+ * Verifies a password without blocking the event loop (scrypt runs on the
+ * libuv thread pool), using a constant-time comparison.
+ */
+export async function verifyPassword(password, stored) {
   const [scheme, saltB64, hashB64] = String(stored).split('$');
   if (scheme !== 'scrypt' || !saltB64 || !hashB64) return false;
   const expected = Buffer.from(hashB64, 'base64url');
-  const actual = scryptSync(password, Buffer.from(saltB64, 'base64url'), expected.length);
+  const actual = await scryptAsync(password, Buffer.from(saltB64, 'base64url'), expected.length);
   return timingSafeEqual(expected, actual);
 }
+
+/** Compared against when an email is unknown, so response time does not reveal which accounts exist. */
+export const DUMMY_PASSWORD_HASH = hashPassword(randomBytes(16).toString('hex'));
 
 /** Compact signed token: base64url(payload).base64url(HMAC-SHA256). */
 export function signToken(payload, secret, ttlSeconds, now = Date.now()) {
@@ -25,7 +36,7 @@ export function signToken(payload, secret, ttlSeconds, now = Date.now()) {
 }
 
 export function verifyToken(token, secret, now = Date.now()) {
-  if (typeof token !== 'string' || token.length > 2048) return null;
+  if (typeof token !== 'string' || token.length > MAX_TOKEN_LENGTH) return null;
   const [body, sig] = token.split('.');
   if (!body || !sig) return null;
   const expected = Buffer.from(sign(body, secret));

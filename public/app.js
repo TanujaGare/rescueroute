@@ -131,7 +131,7 @@ async function demoSignIn() {
 
 function signOut(message) {
   setToken(null);
-  clearInterval(state.pollTimer);
+  clearTimeout(state.pollTimer);
   state.user = null;
   $('#app-view').hidden = true;
   $('#session').hidden = true;
@@ -372,26 +372,35 @@ async function startRun(event) {
   }
 }
 
+const POLL_START_MS = 800;
+const POLL_MAX_MS = 4000;
+
+/** Polls a running job with exponential backoff, and pauses while the tab is hidden. */
 function pollRun(id) {
-  clearInterval(state.pollTimer);
+  clearTimeout(state.pollTimer);
+  let delay = POLL_START_MS;
+  const finish = () => {
+    $('#run-btn').disabled = false;
+    loadOverview();
+    loadPlannerStatus();
+  };
   const tick = async () => {
+    if (document.hidden) {
+      state.pollTimer = setTimeout(tick, POLL_MAX_MS);
+      return;
+    }
     try {
       const { run } = await api(`/runs/${id}`);
       renderRun(run);
-      if (run.status !== 'running') {
-        clearInterval(state.pollTimer);
-        $('#run-btn').disabled = false;
-        loadOverview();
-        loadPlannerStatus();
-      }
+      if (run.status !== 'running') return finish();
+      delay = Math.min(delay * 1.5, POLL_MAX_MS);
+      state.pollTimer = setTimeout(tick, delay);
     } catch (err) {
-      clearInterval(state.pollTimer);
       $('#run-btn').disabled = false;
       setStatus($('#run-status'), err.message, true);
     }
   };
   tick();
-  state.pollTimer = setInterval(tick, 1000);
 }
 
 const STEP_LABELS = { model: 'Gemini turn', tool_call: 'Tool', blocked: 'Blocked tool request' };

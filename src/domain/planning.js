@@ -51,18 +51,7 @@ export class PlanState {
       vehicles.map((v) => [v.id, { ...v, available: v.available ?? true, pos: { lat: v.lat, lng: v.lng }, freeAtMin: 0, trips: 0 }]),
     );
     this.assignments = new Map();
-    // Road distances are recomputed many times while ranking options; cache them per coordinate pair.
-    this.distanceCache = new Map();
-  }
-
-  distance(a, b) {
-    const key = `${a.lat},${a.lng}|${b.lat},${b.lng}`;
-    let km = this.distanceCache.get(key);
-    if (km === undefined) {
-      km = roadKm(a, b);
-      this.distanceCache.set(key, km);
-    }
-    return km;
+    this.rankCache = new Map();
   }
 
   minutesFromNow(iso) {
@@ -115,8 +104,8 @@ export class PlanState {
     }
 
     const donor = { lat: donation.donor_lat, lng: donation.donor_lng };
-    const toDonorKm = this.distance(vehicle.pos, donor);
-    const toRecipientKm = this.distance(donor, recipient);
+    const toDonorKm = roadKm(vehicle.pos, donor);
+    const toRecipientKm = roadKm(donor, recipient);
     const arriveDonor = vehicle.freeAtMin + travelMinutes(toDonorKm, vehicle.speed_kmh);
     const pickupMin = Math.max(arriveDonor, this.minutesFromNow(donation.ready_at), 0);
     const deliverMin = pickupMin + LOADING_MINUTES + travelMinutes(toRecipientKm, vehicle.speed_kmh);
@@ -175,22 +164,33 @@ export class PlanState {
       ...result.metrics,
     };
     this.assignments.set(donationId, assignment);
+    // Any commit changes vehicle times and recipient capacity, so cached rankings are stale.
+    this.rankCache.clear();
     return assignment;
   }
 
-  /** Returns the best feasible options for a donation, earliest delivery first. */
+  /**
+   * Returns the best feasible options for a donation, earliest delivery first.
+   * Rankings are memoised until the next commit: the same donation is ranked
+   * during assessment, prompt building and gap-filling, an O(recipients x vehicles) scan each time.
+   */
   rankOptions(donationId, limit = 3) {
-    const options = [];
-    let rejected = 0;
-    for (const recipientId of this.recipients.keys()) {
-      for (const vehicleId of this.vehicles.keys()) {
-        const r = this.evaluate(donationId, recipientId, vehicleId);
-        if (r.feasible) options.push({ recipient_id: recipientId, vehicle_id: vehicleId, ...r.metrics });
-        else rejected += 1;
+    let ranked = this.rankCache.get(donationId);
+    if (!ranked) {
+      const options = [];
+      let rejected = 0;
+      for (const recipientId of this.recipients.keys()) {
+        for (const vehicleId of this.vehicles.keys()) {
+          const r = this.evaluate(donationId, recipientId, vehicleId);
+          if (r.feasible) options.push({ recipient_id: recipientId, vehicle_id: vehicleId, ...r.metrics });
+          else rejected += 1;
+        }
       }
+      options.sort((a, b) => a.deliver_in_min - b.deliver_in_min || a.distance_km - b.distance_km);
+      ranked = { options, rejected };
+      this.rankCache.set(donationId, ranked);
     }
-    options.sort((a, b) => a.deliver_in_min - b.deliver_in_min || a.distance_km - b.distance_km);
-    return { options: options.slice(0, limit), feasible_count: options.length, rejected_count: rejected };
+    return { options: ranked.options.slice(0, limit), feasible_count: ranked.options.length, rejected_count: ranked.rejected };
   }
 
   unallocated() {

@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 /** Bump when the schema changes. Older demo databases are rebuilt and reseeded. */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 const TABLES = ['audit_log', 'dispatches', 'run_stages', 'run_steps', 'runs', 'donations', 'vehicles', 'recipients', 'donors', 'users'];
 
@@ -60,6 +60,9 @@ CREATE TABLE IF NOT EXISTS donations (
   created_by TEXT REFERENCES users(id),
   created_at TEXT NOT NULL
 );
+
+-- Every planning run and dashboard load filters donations by status and expiry.
+CREATE INDEX IF NOT EXISTS idx_donations_status_expiry ON donations(status, expires_at);
 
 CREATE TABLE IF NOT EXISTS runs (
   id TEXT PRIMARY KEY,

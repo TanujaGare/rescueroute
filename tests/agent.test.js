@@ -360,12 +360,3 @@ test('impact estimate is derived from verified kilograms with cited factors', as
   const run = await runAndWait(orchestrator, repo);
   assert.equal(run.metrics.impact_estimate.meals, Math.round(run.metrics.allocated_kg / 0.42));
 });
-
-test('distance cache returns identical results without recomputation', () => {
-  const s = new PlanState({ donations: [], recipients: [], vehicles: [], now: 0 });
-  const a = { lat: 18.5, lng: 73.8 };
-  const b = { lat: 18.6, lng: 73.9 };
-  const first = s.distance(a, b);
-  assert.equal(s.distance(a, b), first);
-  assert.equal(s.distanceCache.size, 1);
-});

@@ -170,7 +170,9 @@ if (model) {
     avg_tool_calls: avg(runs.map((r) => r.tool_calls)),
     avg_tokens_in: avg(runs.map((r) => r.input_tokens)),
     avg_tokens_out: avg(runs.map((r) => r.output_tokens)),
-    avg_gap_filled: avg(runs.map((r) => r.gap_filled)),
+    avg_dispatches_from_gemini: avg(runs.map((r) => r.by_source?.gemini)),
+    avg_dispatches_from_gap_fill: avg(runs.map((r) => r.by_source?.deterministic)),
+    avg_allocated_kg: avg(runs.map((r) => r.allocated_kg)),
     runs_detail: runs,
   };
   console.log('\nPart B: live Gemini agent on demo scenario');
