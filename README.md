@@ -2,6 +2,8 @@
 
 > An AI agent that routes surplus food from restaurants, hostels and events to NGOs **before it expires**. Every constraint is verified in code, and a human approves every dispatch.
 
+> 🏆 **Result: 4th place, with a final evaluation score of 97.08.**
+
 **Domains:** Sustainability · Food · Open innovation
 **Stack:** Node.js 24 · Express 5 · SQLite (built-in `node:sqlite`) · Google **Gemini API** (function calling, automatic model failover) · vanilla HTML/CSS/JS (no build step)
 

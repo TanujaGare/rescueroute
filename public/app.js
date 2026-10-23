@@ -162,6 +162,7 @@ async function loadPlannerStatus() {
     badge.textContent = s.label;
     badge.title = s.detail;
     badge.className = `badge planner-${s.state}`;
+    badge.hidden = s.state === 'unverified';
     const parts = [s.detail];
     if (s.model) parts.push(`Model: ${s.model}.`);
     if (s.stats.runs) parts.push(`Your runs: ${s.stats.runs} (Gemini ${pct(s.stats.gemini_run_rate)}, fallback ${pct(s.stats.fallback_rate)}).`);
