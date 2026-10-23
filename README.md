@@ -9,7 +9,9 @@
 
 **Live app:** **https://rescueroute-pied.vercel.app** (deployed on Vercel; you can also run it locally at `http://localhost:8080`, see [Run it locally](#8-run-it-locally)). A Gemini planning run takes about 1–2 minutes; the page shows the full timeline when it finishes.
 
-All demo accounts use the password **`tanuja`**.
+**Fastest way in:** click **"Try instant demo (no sign-in needed)"** on the sign-in page. It opens a dedicated *Demo Guest* coordinator account with full access to the agent, a 2-hour session and its own run history. It is rate-limited, audited, and can be turned off with `DEMO_LOGIN_ENABLED=false`.
+
+To sign in with an account instead, all demo accounts use the password **`tanuja`**.
 
 | Role | Email | Password | Can do |
 |---|---|---|---|
@@ -20,7 +22,7 @@ All demo accounts use the password **`tanuja`**.
 These are seeded **demo** credentials for a synthetic dataset, published intentionally so evaluators can sign in. Change them with the `DEMO_PASSWORD` environment variable.
 
 **Two-minute walkthrough**
-1. Sign in as the coordinator. The **Dashboard** shows open donations, food expiring within 3 h, the network map, recipients and vehicles (one vehicle is deliberately unavailable).
+1. Click **Try instant demo** (or sign in as the coordinator). The **Dashboard** shows open donations, food expiring within 3 h, the network map, recipients and vehicles (one vehicle is deliberately unavailable).
 2. Open **Plan with agent** and click **Test Gemini connection** (a live request; the header badge updates to the real result).
 3. Click **Run agent**. Watch the **Execution timeline**: each stage shows its real status and measured duration, and *Technical details* expands the structured output and the Gemini tool-call trace.
 4. Review **Proposed dispatches**: verified facts (distance, pickup and delivery time, safety slack) are kept separate from the Gemini rationale. **Approve**, **Reject** or **Mark delivered**.
@@ -34,7 +36,7 @@ If Gemini is busy or rate-limited, the run switches to a backup model, or uses t
 | Area | Evidence | Reproduce |
 |---|---|---|
 | **Problem alignment** | Bounded agent workflow: analyze → assess → Gemini plan (tool calls) → fallback → verify → save → evaluate → summarize, with human approval | `npm run check:gemini` |
-| **Testing** | 55 automated tests (unit, API integration, agent failure paths, security, accessibility); **97.2% line / 87.9% branch coverage** | `npm run test:coverage` |
+| **Testing** | 58 automated tests (unit, API integration, agent failure paths, security, accessibility); **97.2% line / 87.9% branch coverage** | `npm run test:coverage` |
 | **Security** | Threat model in [SECURITY.md](SECURITY.md); RBAC, IDOR protection, CSP, rate limits, prompt-injection containment, audit log; **0 production vulnerabilities** | `npm run audit` |
 | **Code quality** | ESLint (recommended rules plus an `innerHTML` ban), layered modules, dependency injection, one Zod schema for validation and the Gemini tool declarations, CI on every push | `npm run lint` |
 | **Efficiency** | Deterministic planner p50 0.74 ms per scenario; batched Gemini tool calls; 5 runtime dependencies; no frontend build | `npm run evaluate` |
@@ -166,7 +168,7 @@ Run `npm run evaluate`. Results are written to [evaluation/results.json](evaluat
 ## 7. Tests
 
 ```bash
-npm test               # 55 tests: unit, API integration, agent workflow, security, accessibility
+npm test               # 58 tests: unit, API integration, agent workflow, security, accessibility
 npm run test:coverage  # same, with coverage report (97.2% lines)
 npm run check:gemini   # manual LIVE check: real Gemini request + one full run (needs GEMINI_API_KEY)
 npm run lint           # ESLint + syntax, XSS and debugger guards
@@ -224,6 +226,7 @@ Note: on free hosting the SQLite file is ephemeral, so data resets on redeploy. 
 |---|---|---|---|
 | GET | `/healthz` | public | DB status, whether Gemini is configured, and the last check result |
 | POST | `/api/auth/login` | public | Returns a bearer token |
+| POST | `/api/auth/demo` | public (rate-limited) | One-click guest coordinator session for evaluators |
 | GET | `/api/overview` | any | KPIs, donations, recipients, vehicles |
 | POST | `/api/donations` | coordinator | Log a donation |
 | POST | `/api/runs` | coordinator | Start an agent run (202, runs in the background) |

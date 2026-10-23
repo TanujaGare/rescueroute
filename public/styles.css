@@ -245,3 +245,9 @@ body:not(.role-viewer) .viewer-only { display: none; }
 .badge.planner-unavailable { background: var(--bad-soft); color: var(--bad); }
 .dispatch details { font-size: .85rem; margin-top: 4px; }
 .dispatch .assumption { font-size: .85rem; color: var(--muted); margin: 4px 0 0; }
+
+/* ---- Instant demo entry ---- */
+.btn-block { width: 100%; margin-top: 8px; min-height: 48px; font-size: 1rem; }
+.center { text-align: center; }
+.divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .85rem; margin: 16px 0 4px; }
+.divider::before, .divider::after { content: ""; flex: 1; border-top: 1px solid var(--border); }

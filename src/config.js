@@ -33,6 +33,8 @@ export function loadConfig(overrides = {}) {
     sessionSecret,
     sessionTtlSeconds: toInt(env.SESSION_TTL_SECONDS, 8 * 3600),
     demoPassword: env.DEMO_PASSWORD || 'tanuja',
+    // One-click guest sign-in for evaluators. Set DEMO_LOGIN_ENABLED=false to turn it off.
+    demoLoginEnabled: env.DEMO_LOGIN_ENABLED !== 'false',
     gemini: {
       apiKey: env.GEMINI_API_KEY || '',
       model: env.GEMINI_MODEL || 'gemini-3.5-flash',

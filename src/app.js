@@ -93,6 +93,15 @@ export function createApp({ db, repo, config, orchestrator, logger, clock = () =
     res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   });
 
+  // One-click demo access: signs in as a dedicated guest coordinator with its own run history.
+  api.post('/auth/demo', limiter(20, 15 * 60_000), (req, res) => {
+    const user = config.demoLoginEnabled ? repo.findUserById('usr_demo') : null;
+    if (!user) return res.status(404).json({ error: { code: 'DEMO_DISABLED', message: 'Demo access is not enabled' } });
+    repo.audit(user.id, 'auth.demo', null, null);
+    const token = signToken({ sub: user.id, role: user.role }, config.sessionSecret, Math.min(config.sessionTtlSeconds, 2 * 3600), clock());
+    res.json({ token, user });
+  });
+
   api.get('/me', auth, (req, res) => res.json({ user: req.user }));
 
   api.get('/planner/status', auth, (req, res) => {

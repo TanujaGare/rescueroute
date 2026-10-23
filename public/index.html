@@ -6,8 +6,8 @@
   <meta name="description" content="RescueRoute: an agentic AI dispatcher that routes surplus food to NGOs before it expires.">
   <title>RescueRoute</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=4">
-  <script type="module" src="app.js?v=4"></script>
+  <link rel="stylesheet" href="styles.css?v=5">
+  <script type="module" src="app.js?v=5"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -29,13 +29,16 @@
       <div class="login-card">
         <h1 id="login-title">Rescue surplus food before it expires</h1>
         <p class="lede">An AI agent plans which NGO receives each donation and which vehicle carries it. Every constraint is verified in code, and a coordinator approves every dispatch.</p>
+        <button type="button" class="btn btn-primary btn-block" id="demo-btn">Try instant demo (no sign-in needed)</button>
+        <p class="hint center">Opens as a demo coordinator with full access to the agent. Or sign in below.</p>
+        <p class="divider" aria-hidden="true"><span>or sign in</span></p>
         <form id="login-form" novalidate>
           <label for="email">Email</label>
           <input id="email" name="email" type="email" autocomplete="username" required value="coordinator@rescueroute.demo">
           <label for="password">Password</label>
           <input id="password" name="password" type="password" autocomplete="current-password" required>
           <p class="form-error" id="login-error" role="alert"></p>
-          <button type="submit" class="btn btn-primary">Sign in</button>
+          <button type="submit" class="btn btn-ghost">Sign in</button>
         </form>
         <details class="demo-creds">
           <summary>Demo accounts for evaluators</summary>

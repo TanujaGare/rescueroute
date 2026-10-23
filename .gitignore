@@ -28,3 +28,6 @@ data/
 *.db
 *.db-*
 .vercel
+
+.vercel
+.env*

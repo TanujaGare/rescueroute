@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 /** Bump when the schema changes. Older demo databases are rebuilt and reseeded. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const TABLES = ['audit_log', 'dispatches', 'run_stages', 'run_steps', 'runs', 'donations', 'vehicles', 'recipients', 'donors', 'users'];
 

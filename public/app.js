@@ -113,6 +113,22 @@ async function signIn(event) {
   }
 }
 
+async function demoSignIn() {
+  const button = $('#demo-btn');
+  const errorBox = $('#login-error');
+  errorBox.textContent = '';
+  button.disabled = true;
+  try {
+    const { token } = await api('/auth/demo', { method: 'POST' });
+    setToken(token);
+    await enterApp();
+  } catch (err) {
+    errorBox.textContent = err.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function signOut(message) {
   setToken(null);
   clearInterval(state.pollTimer);
@@ -549,6 +565,7 @@ async function loadAudit() {
 
 document.addEventListener('DOMContentLoaded', () => {
   $('#login-form').addEventListener('submit', signIn);
+  $('#demo-btn').addEventListener('click', demoSignIn);
   $('#logout').addEventListener('click', () => signOut());
   $('#refresh').addEventListener('click', loadOverview);
   $('#reset-demo').addEventListener('click', resetDemo);

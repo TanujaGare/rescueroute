@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
-import { buildTestApp, login, NOW, scriptedModel } from './helpers.js';
+import { buildTestApp, login, NOW, scriptedModel, PASSWORD } from './helpers.js';
 import { signToken, verifyToken, hashPassword, verifyPassword } from '../src/security/auth.js';
 
 const at = (min) => new Date(NOW + min * 60_000).toISOString();
@@ -288,4 +288,32 @@ test('serverless mode completes the run within the request and returns it', asyn
   assert.notEqual(res.body.run.status, 'running');
   assert.ok(res.body.run.stages.length >= 7);
   assert.ok(res.body.run.dispatches.length > 0);
+});
+
+test('instant demo sign-in issues a guest coordinator session that is isolated and cannot use the password form', async () => {
+  const { app, orchestrator } = buildTestApp();
+  const res = await request(app).post('/api/auth/demo');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.user.id, 'usr_demo');
+  assert.equal(res.body.user.role, 'coordinator');
+  assert.ok(!('password_hash' in res.body.user));
+  const auth = { Authorization: `Bearer ${res.body.token}` };
+  assert.equal((await request(app).get('/api/overview').set(auth)).status, 200);
+
+  // The guest's runs are not visible to the named coordinator, and vice versa.
+  const id = (await request(app).post('/api/runs').set(auth).send({ objective: 'Demo run for judges' })).body.id;
+  await orchestrator.idle();
+  const other = await login(app);
+  assert.equal((await request(app).get(`/api/runs/${id}`).set('Authorization', `Bearer ${other}`)).status, 404);
+
+  const pw = await request(app).post('/api/auth/login').send({ email: 'guest@rescueroute.demo', password: PASSWORD });
+  assert.equal(pw.status, 401, 'guest account has no usable password');
+  const audit = (await request(app).get('/api/audit').set(auth)).body.entries.map((e) => e.action);
+  assert.ok(audit.includes('auth.demo'));
+});
+
+test('instant demo sign-in can be disabled', async () => {
+  const { app, config } = buildTestApp();
+  config.demoLoginEnabled = false;
+  assert.equal((await request(app).post('/api/auth/demo')).status, 404);
 });

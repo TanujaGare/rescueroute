@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { hashPassword } from '../security/auth.js';
 import { transaction } from './database.js';
 
@@ -67,6 +68,8 @@ export function seedDemoData(db, { now = Date.now(), demoPassword }) {
     user.run('usr_coord', 'coordinator@rescueroute.demo', 'Asha (Coordinator)', 'coordinator', hashPassword(demoPassword));
     user.run('usr_coord2', 'coordinator2@rescueroute.demo', 'Ravi (Coordinator)', 'coordinator', hashPassword(demoPassword));
     user.run('usr_viewer', 'viewer@rescueroute.demo', 'Meera (Viewer)', 'viewer', hashPassword(demoPassword));
+    // Used by the one-click demo sign-in; a random password means it cannot be used with the normal login form.
+    user.run('usr_demo', 'guest@rescueroute.demo', 'Demo Guest (Coordinator)', 'coordinator', hashPassword(randomBytes(24).toString('hex')));
 
     const donor = db.prepare('INSERT INTO donors (id, name, kind, lat, lng) VALUES (?, ?, ?, ?, ?)');
     for (const d of DONORS) donor.run(...d);
