@@ -5,6 +5,30 @@
 **Domains:** Sustainability · Food · Open innovation
 **Stack:** Node.js 24 · Express 5 · SQLite (built-in `node:sqlite`) · Google **Gemini API** (function calling, automatic model failover) · vanilla HTML/CSS/JS (no build step)
 
+## Evaluator access
+
+**Live app:** _deployment URL will be added here_ (or run locally at `http://localhost:8080`, see [Run it locally](#8-run-it-locally)).
+
+All demo accounts use the password **`tanuja`**.
+
+| Role | Email | Password | Can do |
+|---|---|---|---|
+| **Coordinator** (use this one) | `coordinator@rescueroute.demo` | `tanuja` | Run the agent, test the Gemini connection, add donations, approve, reject and mark dispatches delivered, reset demo data |
+| Second coordinator | `coordinator2@rescueroute.demo` | `tanuja` | Same, but cannot see the first coordinator's runs (shows cross-user isolation) |
+| Viewer | `viewer@rescueroute.demo` | `tanuja` | Read-only dashboard (shows role-based access control) |
+
+These are seeded **demo** credentials for a synthetic dataset, published intentionally so evaluators can sign in. Change them with the `DEMO_PASSWORD` environment variable.
+
+**Two-minute walkthrough**
+1. Sign in as the coordinator. The **Dashboard** shows open donations, food expiring within 3 h, the network map, recipients and vehicles (one vehicle is deliberately unavailable).
+2. Open **Plan with agent** and click **Test Gemini connection** (a live request; the header badge updates to the real result).
+3. Click **Run agent**. Watch the **Execution timeline**: each stage shows its real status and measured duration, and *Technical details* expands the structured output and the Gemini tool-call trace.
+4. Review **Proposed dispatches**: verified facts (distance, pickup and delivery time, safety slack) are kept separate from the Gemini rationale. **Approve**, **Reject** or **Mark delivered**.
+5. Check **Run history** (planner used, fallback reason, validation and urgent-coverage metrics) and the **Audit log**.
+6. Optional: sign in as `viewer@rescueroute.demo` to see read-only access, or as `coordinator2@…` to see that other users' runs are hidden.
+
+If Gemini is busy or rate-limited, the run switches to a backup model, or uses the deterministic planner and shows the reason as a warning. It never reports a fallback as an AI success.
+
 ### At a glance (all figures measured locally on 23 Oct 2026; reproduce with the commands shown)
 
 | Area | Evidence | Reproduce |
@@ -17,7 +41,7 @@
 | **Impact** | +67.5% food delivered safely vs first-come-first-served dispatch on 200 synthetic scenarios, with 0 vs 1,558 unsafe dispatches | `npm run evaluate` |
 | **Accessibility** | Skip link, landmarks, labelled controls, live regions, table captions, focus styles, reduced motion, dark mode; checked by automated tests | `tests/accessibility.test.js` |
 
-**Contents:** [Problem](#1-the-problem) · [Solution](#2-what-rescueroute-does) · [Architecture](#3-architecture) · [Google tech](#4-google-technology) · [Security](#5-security) · [Results](#6-measured-results) · [Tests](#7-tests) · [Run locally](#8-run-it-locally) · [Deploy](#9-deploy) · [API](#10-api) · [Disclosure](#11-disclosure)
+**Contents:** [Evaluator access](#evaluator-access) · [Problem](#1-the-problem) · [Solution](#2-what-rescueroute-does) · [Architecture](#3-architecture) · [Google tech](#4-google-technology) · [Security](#5-security) · [Results](#6-measured-results) · [Tests](#7-tests) · [Run locally](#8-run-it-locally) · [Deploy](#9-deploy) · [API](#10-api) · [Disclosure](#11-disclosure)
 
 ---
 
