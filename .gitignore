@@ -1,0 +1,29 @@
+﻿# Dependencies
+node_modules/
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+
+# Build output
+dist/
+build/
+.next/
+
+# Secrets - never push API keys
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Event material (not part of the project)
+AGENDA OF EVENT.pdf
+data/
+*.db
+*.db-*

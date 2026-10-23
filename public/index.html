@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="RescueRoute: an agentic AI dispatcher that routes surplus food to NGOs before it expires.">
+  <title>RescueRoute</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css?v=3">
+  <script type="module" src="app.js?v=3"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 17h10l4-6h2v6h-2M4 17V7h10v10M7 20a2 2 0 1 0 0-.01M17 20a2 2 0 1 0 0-.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>RescueRoute</span>
+    </div>
+    <div class="session" id="session" hidden>
+      <span class="badge" id="planner-badge" title="">Planner: checking…</span>
+      <span id="user-label"></span>
+      <button type="button" class="btn btn-ghost" id="logout">Sign out</button>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section id="login-view" class="login" aria-labelledby="login-title">
+      <div class="login-card">
+        <h1 id="login-title">Rescue surplus food before it expires</h1>
+        <p class="lede">An AI agent plans which NGO receives each donation and which vehicle carries it. Every constraint is verified in code, and a coordinator approves every dispatch.</p>
+        <form id="login-form" novalidate>
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" autocomplete="username" required value="coordinator@rescueroute.demo">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+          <p class="form-error" id="login-error" role="alert"></p>
+          <button type="submit" class="btn btn-primary">Sign in</button>
+        </form>
+        <details class="demo-creds">
+          <summary>Demo accounts for evaluators</summary>
+          <p>Password for all demo accounts: <code>tanuja</code></p>
+          <ul>
+            <li><code>coordinator@rescueroute.demo</code>: can run the agent and approve</li>
+            <li><code>coordinator2@rescueroute.demo</code>: second coordinator (cannot see the first one's runs)</li>
+            <li><code>viewer@rescueroute.demo</code>: read-only</li>
+          </ul>
+        </details>
+      </div>
+    </section>
+
+    <section id="app-view" hidden>
+      <nav class="tabs" aria-label="Sections">
+        <button type="button" class="tab" data-view="dashboard" aria-current="page">Dashboard</button>
+        <button type="button" class="tab" data-view="agent">Plan with agent</button>
+        <button type="button" class="tab" data-view="history">Run history</button>
+        <button type="button" class="tab" data-view="audit">Audit log</button>
+      </nav>
+
+      <!-- Dashboard -->
+      <div class="view" id="view-dashboard" data-view-panel="dashboard">
+        <div class="view-head">
+          <h1>Today's surplus</h1>
+          <div class="actions">
+            <button type="button" class="btn btn-ghost" id="refresh">Refresh</button>
+            <button type="button" class="btn btn-ghost coordinator-only" id="reset-demo">Reset demo data</button>
+          </div>
+        </div>
+        <p class="status-line" id="dashboard-status" role="status" aria-live="polite"></p>
+        <div class="kpis" id="kpis"></div>
+
+        <div class="grid-2">
+          <section class="card" aria-labelledby="map-title">
+            <h2 id="map-title">Network map</h2>
+            <div id="map" class="map"></div>
+            <ul class="legend" aria-label="Map legend">
+              <li><span class="dot dot-donor"></span>Donor with open food</li>
+              <li><span class="dot dot-recipient"></span>NGO recipient</li>
+              <li><span class="dot dot-vehicle"></span>Vehicle base</li>
+            </ul>
+          </section>
+          <section class="card" aria-labelledby="partners-title">
+            <h2 id="partners-title">Recipients and fleet</h2>
+            <div class="table-wrap"><table id="recipients-table"><caption class="sr-only">Recipients</caption></table></div>
+            <div class="table-wrap"><table id="vehicles-table"><caption class="sr-only">Vehicles</caption></table></div>
+          </section>
+        </div>
+
+        <section class="card" aria-labelledby="donations-title">
+          <h2 id="donations-title">Donations</h2>
+          <div class="table-wrap"><table id="donations-table"><caption class="sr-only">Donations, most urgent first</caption></table></div>
+        </section>
+
+        <section class="card coordinator-only" aria-labelledby="add-title">
+          <h2 id="add-title">Log a new donation</h2>
+          <form id="donation-form" class="form-grid" novalidate>
+            <div><label for="d-donor">Donor</label><select id="d-donor" name="donor_id" required></select></div>
+            <div><label for="d-category">Category</label>
+              <select id="d-category" name="category" required>
+                <option value="cooked_meal">Cooked meal</option><option value="bakery">Bakery</option>
+                <option value="produce">Produce</option><option value="dairy">Dairy</option><option value="packaged">Packaged</option>
+              </select></div>
+            <div class="span-2"><label for="d-desc">Description</label><input id="d-desc" name="description" required minlength="3" maxlength="200"></div>
+            <div><label for="d-kg">Quantity (kg)</label><input id="d-kg" name="quantity_kg" type="number" min="0.5" max="1000" step="0.5" required></div>
+            <div><label for="d-expires">Expires in (minutes)</label><input id="d-expires" name="expires_in" type="number" min="15" max="10080" step="5" value="180" required></div>
+            <div class="checkbox"><input id="d-cold" name="needs_cold" type="checkbox"><label for="d-cold">Needs cold chain</label></div>
+            <div class="span-2"><label for="d-notes">Donor notes (optional)</label><input id="d-notes" name="notes" maxlength="300"></div>
+            <p class="form-error span-2" id="donation-error" role="alert"></p>
+            <div class="span-2"><button type="submit" class="btn btn-primary">Add donation</button></div>
+          </form>
+        </section>
+      </div>
+
+      <!-- Agent -->
+      <div class="view" id="view-agent" data-view-panel="agent" hidden>
+        <div class="view-head"><h1>Plan with the agent</h1></div>
+        <form id="run-form" class="card coordinator-only">
+          <label for="objective">Objective for this planning run</label>
+          <textarea id="objective" name="objective" rows="2" maxlength="500" required>Route all open donations to NGOs before they expire. Prioritise perishable cooked meals and keep travel distance low.</textarea>
+          <div class="run-row">
+            <button type="submit" class="btn btn-primary" id="run-btn">Run agent</button>
+            <button type="button" class="btn btn-ghost" id="check-btn">Test Gemini connection</button>
+            <span class="hint">The agent proposes dispatches only; you approve each one below.</span>
+          </div>
+          <p class="status-line" id="check-status" role="status" aria-live="polite"></p>
+        </form>
+        <section class="card" aria-labelledby="planner-title">
+          <h2 id="planner-title">Planner status</h2>
+          <p id="planner-detail" class="hint"></p>
+        </section>
+        <p class="viewer-only notice">You have read-only access. Sign in as a coordinator to run the agent.</p>
+        <p class="status-line" id="run-status" role="status" aria-live="polite"></p>
+
+        <div id="run-output" hidden>
+          <section class="card" aria-labelledby="eval-title">
+            <h2 id="eval-title">Outcome</h2>
+            <p id="run-summary" class="summary"></p>
+            <ul class="criteria" id="criteria"></ul>
+            <dl class="metrics" id="run-metrics"></dl>
+            <h3 class="subhead">Same input, deterministic planner only</h3>
+            <div class="table-wrap"><table id="comparison-table"><caption class="sr-only">Comparison of this run against the deterministic planner on the same data</caption></table></div>
+          </section>
+
+          <section class="card" aria-labelledby="dispatch-title">
+            <h2 id="dispatch-title">Proposed dispatches awaiting approval</h2>
+            <p class="hint">Facts marked <span class="tag tag-verified">verified</span> are computed in code. <span class="tag tag-inferred">Gemini rationale</span> is model-written and not authoritative. Approving does not mean delivered: mark a dispatch delivered once the food arrives.</p>
+            <div id="dispatches"></div>
+          </section>
+
+          <section class="card" aria-labelledby="timeline-title">
+            <h2 id="timeline-title">Execution timeline</h2>
+            <p class="hint">Statuses and durations are measured on the server for each stage.</p>
+            <ol class="timeline" id="timeline"></ol>
+          </section>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="view" id="view-history" data-view-panel="history" hidden>
+        <div class="view-head"><h1>Run history</h1></div>
+        <div class="kpis" id="run-stats"></div>
+        <section class="card"><div class="table-wrap"><table id="runs-table"><caption class="sr-only">Your previous planning runs</caption></table></div></section>
+      </div>
+
+      <!-- Audit -->
+      <div class="view" id="view-audit" data-view-panel="audit" hidden>
+        <div class="view-head"><h1>Audit log</h1></div>
+        <section class="card"><div class="table-wrap"><table id="audit-table"><caption class="sr-only">Your recent actions</caption></table></div></section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Demo uses <strong>synthetic data</strong>: organisations and quantities are fictional; locations are real Pune coordinates. Travel times are estimates (straight-line distance × 1.35 road factor).</p>
+  </footer>
+</body>
+</html>

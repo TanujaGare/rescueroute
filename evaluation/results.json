@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-10-23T08:12:36.317Z",
+  "node": "v24.14.1",
+  "part_a": {
+    "scenarios": 200,
+    "data": "synthetic, seeded (mulberry32 seeds 1..N), Pune bounding box",
+    "open_kg": 109684,
+    "feasible_kg_upper_bound": 86405,
+    "naive_baseline": {
+      "safely_delivered_kg": 32185,
+      "share_of_feasible": "37.2%",
+      "unsafe_or_invalid_dispatches": 1558,
+      "unsafe_rate": "63.5%"
+    },
+    "rescueroute_planner": {
+      "safely_delivered_kg": 53918,
+      "share_of_feasible": "62.4%",
+      "unsafe_or_invalid_dispatches": 0,
+      "latency_ms_p50": 0.85,
+      "latency_ms_p95": 1.82
+    },
+    "improvement_kg_vs_naive": "67.5%"
+  },
+  "part_b": {
+    "skipped": "GEMINI_API_KEY not set. No Gemini results are reported."
+  }
+}
