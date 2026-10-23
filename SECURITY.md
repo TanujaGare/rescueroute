@@ -13,9 +13,9 @@ RescueRoute lets an AI model *propose* actions, so the main risks are a model or
 | Food safety | Infeasible plans (expired food, broken cold chain, overloads) | 11 hard constraints checked in code at proposal time and again against fresh DB state before saving | `src/domain/planning.js`, `verifyAgainstDatabase` |
 | Inventory integrity | Double allocation under concurrency | `BEGIN IMMEDIATE` transactions, conditional claim (`status='open' AND expires_at > now`), partial unique index | `src/db/` |
 | User data | Cross-user access (IDOR) | Every run and dispatch query is scoped by `user_id`; other users get 404 | `src/db/repository.js` |
-| Accounts | Credential stuffing, token forgery | scrypt hashes, HMAC-SHA256 tokens with expiry, constant-time comparison, login rate limit | `src/security/auth.js`, `src/app.js` |
-| Browser | XSS, clickjacking | Strict CSP (no inline script), `textContent` rendering enforced by ESLint, `frame-ancestors 'none'` | `src/app.js`, `eslint.config.js` |
-| Availability and cost | Abuse, runaway agent loops | Rate limits, 16 KB body limit, model timeout and retry limits, turn, tool and time budgets, one run at a time | `src/app.js`, `src/agent/orchestrator.js` |
+| Accounts | Credential stuffing, token forgery | Async (non-blocking) scrypt hashes, HMAC-SHA256 tokens with expiry, constant-time comparison, dummy-hash check so unknown emails are indistinguishable by timing, login rate limit | `src/security/auth.js`, `src/http/routes/auth.js` |
+| Browser | XSS, clickjacking | Strict CSP (no inline script), `textContent` rendering enforced by ESLint, `frame-ancestors 'none'` | `src/http/middleware.js`, `eslint.config.js` |
+| Availability and cost | Abuse, runaway agent loops | Rate limits, 16 KB body limit, model timeout and retry limits, turn, tool and time budgets, one run at a time | `src/http/`, `src/agent/model-loop.js` |
 | Accountability | Untraceable actions | Audit log for logins, runs, fallbacks, verification rejections, approvals and deliveries | `audit_log` table |
 
 ## Verifying the controls
