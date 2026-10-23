@@ -11,9 +11,10 @@ export const PASSWORD = 'test-password-123';
 export const NOW = Date.parse('2026-10-23T12:00:00Z');
 
 /** Builds a fully wired app on an in-memory database with a fixed clock. */
-export function buildTestApp({ model = null, agent = {} } = {}) {
+export function buildTestApp({ model = null, agent = {}, serverless = false } = {}) {
   const clock = () => NOW;
   const config = loadConfig({ skipEnvFile: true, sessionSecret: 'x'.repeat(40), demoPassword: PASSWORD });
+  config.serverless = serverless;
   config.agent = { ...config.agent, modelTimeoutMs: 200, modelRetries: 1, rateLimitBackoffMs: 5, ...agent };
   const db = openDatabase(':memory:');
   seedDemoData(db, { now: NOW, demoPassword: PASSWORD });

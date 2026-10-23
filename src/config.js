@@ -11,6 +11,9 @@ export function loadConfig(overrides = {}) {
   }
   const env = process.env;
   const nodeEnv = env.NODE_ENV || 'development';
+  // Vercel sets VERCEL=1. Serverless functions may be frozen after responding,
+  // so runs execute within the request, and only /tmp is writable.
+  const serverless = env.VERCEL === '1';
 
   let sessionSecret = env.SESSION_SECRET || '';
   if (sessionSecret.length < 32) {
@@ -24,7 +27,8 @@ export function loadConfig(overrides = {}) {
   return {
     nodeEnv,
     port: toInt(env.PORT, 8080),
-    dbPath: env.DB_PATH || 'data/rescueroute.db',
+    dbPath: env.DB_PATH || (serverless ? '/tmp/rescueroute.db' : 'data/rescueroute.db'),
+    serverless,
     trustProxy: env.TRUST_PROXY === 'true',
     sessionSecret,
     sessionTtlSeconds: toInt(env.SESSION_TTL_SECONDS, 8 * 3600),

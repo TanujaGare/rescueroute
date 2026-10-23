@@ -279,3 +279,13 @@ test('planner status: a stale no-key run does not hide a newly configured key; n
   const newerCheck = { ok: true, code: 'OK', at: '2026-10-23T08:20:00Z' };
   assert.equal(buildPlannerStatus({ model, latestRun: rateRun, lastCheck: newerCheck, stats }).label, 'Gemini AI active');
 });
+
+test('serverless mode completes the run within the request and returns it', async () => {
+  const { app } = buildTestApp({ serverless: true });
+  const token = await login(app);
+  const res = await request(app).post('/api/runs').set('Authorization', `Bearer ${token}`).send({ objective: 'Rescue everything possible' });
+  assert.equal(res.status, 201);
+  assert.notEqual(res.body.run.status, 'running');
+  assert.ok(res.body.run.stages.length >= 7);
+  assert.ok(res.body.run.dispatches.length > 0);
+});

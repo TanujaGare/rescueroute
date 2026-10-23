@@ -143,14 +143,17 @@ export function createApp({ db, repo, config, orchestrator, logger, clock = () =
     res.status(201).json({ id });
   });
 
-  api.post('/runs', auth, coordinator, limiter(20, 60 * 60_000, true), (req, res) => {
+  api.post('/runs', auth, coordinator, limiter(20, 60 * 60_000, true), async (req, res) => {
     const body = parseBody(runSchema, req, res);
     if (!body) return;
     const started = orchestrator.start(req.user, body.objective);
     if (started.conflict) {
       return res.status(409).json({ error: { code: 'RUN_IN_PROGRESS', message: 'Another planning run is in progress. Try again shortly.' } });
     }
-    res.status(202).json({ id: started.runId });
+    if (!config.serverless) return res.status(202).json({ id: started.runId });
+    // Serverless: finish within the request and return the full result, since work after the response may be frozen.
+    await started.done;
+    res.status(201).json({ id: started.runId, run: repo.getRunForUser(started.runId, req.user.id) });
   });
 
   api.get('/runs', auth, (req, res) => res.json({ runs: repo.listRunsForUser(req.user.id), stats: repo.runStats(req.user.id) }));

@@ -337,10 +337,19 @@ async function startRun(event) {
   button.disabled = true;
   setStatus(status, 'Starting agent run…');
   try {
-    const { id } = await api('/runs', { method: 'POST', body: { objective: $('#objective').value } });
+    setStatus(status, 'Agent running… this can take up to a minute with Gemini.');
+    const { id, run } = await api('/runs', { method: 'POST', body: { objective: $('#objective').value } });
     state.currentRunId = id;
     $('#run-output').hidden = false;
-    pollRun(id);
+    if (run) {
+      // Serverless deployments return the finished run directly.
+      renderRun(run);
+      button.disabled = false;
+      loadOverview();
+      loadPlannerStatus();
+    } else {
+      pollRun(id);
+    }
   } catch (err) {
     setStatus(status, err.message, true);
     button.disabled = false;
@@ -480,8 +489,8 @@ async function act(path, body, message, runId) {
   try {
     await api(path, { method: 'POST', body });
     setStatus($('#run-status'), message);
-    const { run } = await api(`/runs/${runId}`);
-    renderRun(run);
+    const { run } = await api(`/runs/${runId}`, { allowError: true });
+    if (run) renderRun(run);
     loadOverview();
   } catch (err) {
     setStatus($('#run-status'), err.message, true);

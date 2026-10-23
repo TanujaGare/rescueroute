@@ -27,3 +27,4 @@ AGENDA OF EVENT.pdf
 data/
 *.db
 *.db-*
+.vercel
