@@ -7,7 +7,7 @@
 
 ## Evaluator access
 
-**Live app:** _deployment URL will be added here_ (or run locally at `http://localhost:8080`, see [Run it locally](#8-run-it-locally)).
+**Live app:** **https://rescueroute-pied.vercel.app** (deployed on Vercel; you can also run it locally at `http://localhost:8080`, see [Run it locally](#8-run-it-locally)). A Gemini planning run takes about 1–2 minutes; the page shows the full timeline when it finishes.
 
 All demo accounts use the password **`tanuja`**.
 
